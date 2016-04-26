@@ -79,7 +79,10 @@ class RNNLM_Model(LanguageModel):
     (Don't change the variable names)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    self.input_placeholder = tf.placeholder(tf.int32, shape=(None, self.config.num_steps), name="input")
+    self.labels_placeholder = tf.placeholder(tf.float32, shape=(None, self.config.num_steps), name="labels")
+    self.dropout_placeholder = tf.placeholder(tf.float32, shape=(None), name="dropout") # or shape=None
+    
     ### END YOUR CODE
   
   def add_embedding(self):
@@ -101,7 +104,15 @@ class RNNLM_Model(LanguageModel):
     # The embedding lookup is currently only implemented for the CPU
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
-      raise NotImplementedError
+      L = tf.get_variable("L", shape=(len(self.vocab), self.config.embed_size))
+      
+      # self.input_placeholder is (batch_size, num_steps)
+
+      # shape is (num_steps, batch_size, embed_size) 
+      inputs = tf.nn.embedding_lookup(L, tf.transpose(self.input_placeholder))
+      
+      # convert to list...
+      inputs = [tf.squeeze(x) for x in tf.split(0, self.config.num_steps, inputs)]
       ### END YOUR CODE
       return inputs
 
@@ -125,7 +136,13 @@ class RNNLM_Model(LanguageModel):
                (batch_size, len(vocab)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    with tf.variable_scope("Projection"):
+      # initializer?
+      U = tf.get_variable("U", shape=(self.config.hidden_size, len(self.vocab)))
+      b2 = tf.get_variable("b2", shape=(len(self.vocab),))
+      outputs = [tf.matmul(h, U) + b2 for h in rnn_outputs]
+      # dropout?
+      # outputs = [tf.nn.dropout(o, self.dropout_placeholder) for o in outputs]
     ### END YOUR CODE
     return outputs
 
@@ -140,7 +157,27 @@ class RNNLM_Model(LanguageModel):
       loss: A 0-d tensor (scalar)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    # weights?
+    #def sequence_loss(logits, targets, weights,
+    #              average_across_timesteps=True, average_across_batch=True,
+    #              softmax_loss_function=None, name=None):
+  """Weighted cross-entropy loss for a sequence of logits, batch-collapsed.
+  Args:
+    logits: List of 2D Tensors of shape [batch_size x num_decoder_symbols].
+    targets: List of 1D batch-sized int32 Tensors of the same length as logits.
+    weights: List of 1D batch-sized float-Tensors of the same length as logits.
+    average_across_timesteps: If set, divide the returned cost by the total
+      label weight.
+    average_across_batch: If set, divide the returned cost by the batch size.
+    softmax_loss_function: Function (inputs-batch, labels-batch) -> loss-batch
+      to be used instead of the standard softmax (the default if this is None).
+    name: Optional name for this operation, defaults to "sequence_loss".
+  Returns:
+    A scalar float Tensor: The average log-perplexity per symbol (weighted).
+  Raises:
+    ValueError: If len(logits) is different from len(targets) or len(weights).
+  """
+    #loss = sequence_loss(output, self.labels_placeholder, tf.constant(1.0, shape=))
     ### END YOUR CODE
     return loss
 
@@ -164,7 +201,8 @@ class RNNLM_Model(LanguageModel):
       train_op: The Op for training.
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    optimizer = tf.train.AdamOptimizer(self.config.lr)
+    train_op = optimizer.minimize(loss, name="train_op")
     ### END YOUR CODE
     return train_op
   
@@ -226,7 +264,24 @@ class RNNLM_Model(LanguageModel):
                a tensor of shape (batch_size, hidden_size)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    hidden_size = self.config.hidden_size
+    with tf.variable_scope("RNN"):
+      # initializer?
+      H = tf.get_variable("H", shape=(hidden_size, hidden_size))
+      I = tf.get_variable("I", shape=(self.config.embed_size, hidden_size))
+      b1 = tf.get_variable("b1", shape=(hidden_size,))
+
+    self.initial_state = tf.Variable(tf.zeros([self.config.batch_size, hidden_size]))
+
+    prev_h = self.initial_state
+    rnn_outputs = []
+    for step in input:
+      # apply input dropout at each step
+      step = tf.nn.dropout(step, self.dropout_placeholder)
+      prev_h = tf.sigmoid(tf.matmul(prev_h, H) + tf.matmul(step, I) + b1)
+      # apply output dropout at each step
+      rnn_outputs.append(tf.nn.dropout(prev_h, self.dropout_placeholder))
+    self.final_state = prev_h
     ### END YOUR CODE
     return rnn_outputs
 

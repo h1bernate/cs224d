@@ -199,6 +199,11 @@ class NERModel(LanguageModel):
     def get_xavier_variable(name, shape):
       return tf.get_variable(name, shape, initializer=xavier_weight_init())
 
+    def summarize(x):
+      tensor_name = x.op.name
+      tf.histogram_summary(tensor_name + '/activations', x)
+      tf.scalar_summary(tensor_name + '/sparsity', tf.nn.zero_fraction(x))
+
     input_size = self.config.window_size*self.config.embed_size
     hidden_size = self.config.hidden_size
     label_size = self.config.label_size
@@ -208,11 +213,19 @@ class NERModel(LanguageModel):
       h = tf.tanh(tf.matmul(window, W) + b1, name="h")
       h = tf.nn.dropout(h, self.config.dropout, name="Dropout")
 
+    summarize(W)
+    summarize(b1)
+    summarize(h)
+
     with tf.variable_scope("Softmax"):
       U = tf.get_variable("U", shape=(hidden_size, label_size), initializer=xavier_weight_init())
       b2 = tf.get_variable("b2", shape=(label_size), initializer=xavier_weight_init())
       output = tf.matmul(h, U) + b2
       output = tf.nn.dropout(output, self.config.dropout, name="Dropout")
+    
+    summarize(W)
+    summarize(b1)
+    summarize(h)
 
     # unscaled
     self.reg_loss = tf.nn.l2_loss(W, name="W_l2") + tf.nn.l2_loss(U, name="U_l2")
@@ -232,8 +245,13 @@ class NERModel(LanguageModel):
     ### YOUR CODE HERE
     # TODO use tf.nn.sparse_softmax_cross_entropy_with_logits
     loss_per_sample = tf.nn.softmax_cross_entropy_with_logits(y, self.labels_placeholder, name="cross_entropy_loss")
-    loss = tf.reduce_mean(loss_per_sample)
-    loss += self.config.l2 * self.reg_loss
+    ce_loss = tf.reduce_mean(loss_per_sample)
+    reg_loss = self.config.l2 * self.reg_loss
+    loss = ce_loss + reg_loss
+
+    tf.scalar_summary("ce_loss", ce_loss)
+    tf.scalar_summary("reg_loss", reg_loss)
+    tf.scalar_summary("total_loss", loss)
     ### END YOUR CODE
     return loss
 
@@ -266,8 +284,8 @@ class NERModel(LanguageModel):
     """Constructs the network using the helper functions defined above."""
     self.config = config
     # TODO testing
-    self.load_data(debug=False)
-    #self.load_data(debug=True)
+    #self.load_data(debug=False)
+    self.load_data(debug=True)
     self.add_placeholders()
     window = self.add_embedding()
     y = self.add_model(window)
@@ -383,6 +401,12 @@ def test_NER():
       best_val_loss = float('inf')
       best_val_epoch = 0
 
+      # add summary
+      summary_op = tf.merge_all_summaries()
+      if not os.path.exists("./summaries"):
+        os.makedirs("./summaries")
+      summary_writer = tf.train.SummaryWriter("./summaries")
+
       session.run(init)
       for epoch in xrange(config.max_epochs):
         print 'Epoch {}'.format(epoch)
@@ -390,6 +414,10 @@ def test_NER():
         ###
         train_loss, train_acc = model.run_epoch(session, model.X_train,
                                                 model.y_train)
+
+        # summarize epoch
+
+
         val_loss, predictions = model.predict(session, model.X_dev, model.y_dev)
         print 'Training loss: {}'.format(train_loss)
         print 'Training acc: {}'.format(train_acc)
