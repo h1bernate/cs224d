@@ -24,10 +24,8 @@ class Config(object):
   embed_size = 50
   batch_size = 64
   label_size = 5
-  hidden_size = 100 
-  # NOTE testing
+  hidden_size = 100
   max_epochs = 24 
-  #max_epochs = 12
   early_stopping = 2
   dropout = 0.9
   lr = 0.001
@@ -99,7 +97,7 @@ class NERModel(LanguageModel):
     ### YOUR CODE HERE
     self.input_placeholder = tf.placeholder(tf.int32, shape=(None, self.config.window_size), name="input")
     self.labels_placeholder = tf.placeholder(tf.float32, shape=(None, self.config.label_size), name="labels")
-    self.dropout_placeholder = tf.placeholder(tf.float32, shape=(None), name="dropout") # or shape=None
+    self.dropout_placeholder = tf.placeholder(tf.float32, shape=(None), name="dropout") # DEBUG or shape=None
     ### END YOUR CODE
 
   def create_feed_dict(self, input_batch, dropout, label_batch=None):
@@ -208,27 +206,28 @@ class NERModel(LanguageModel):
     hidden_size = self.config.hidden_size
     label_size = self.config.label_size
     with tf.variable_scope("Layer"):
-      W = tf.get_variable("W", shape=(input_size, hidden_size), initializer=xavier_weight_init())
-      b1 = tf.get_variable("b1", shape=(hidden_size,), initializer=xavier_weight_init())
-      h = tf.tanh(tf.matmul(window, W) + b1, name="h")
-      h = tf.nn.dropout(h, self.config.dropout, name="Dropout")
+      W = get_xavier_variable("W", shape=(input_size, hidden_size))
+      b1 = get_xavier_variable("b1", shape=(hidden_size,))
+      h_raw = tf.tanh(tf.matmul(window, W) + b1, name="h")
+      h = tf.nn.dropout(h_raw, self.dropout_placeholder, name="Dropout")
 
     summarize(W)
     summarize(b1)
-    summarize(h)
+    summarize(h_raw)
 
     with tf.variable_scope("Softmax"):
-      U = tf.get_variable("U", shape=(hidden_size, label_size), initializer=xavier_weight_init())
-      b2 = tf.get_variable("b2", shape=(label_size), initializer=xavier_weight_init())
-      output = tf.matmul(h, U) + b2
-      output = tf.nn.dropout(output, self.config.dropout, name="Dropout")
+      U = get_xavier_variable("U", shape=(hidden_size, label_size))
+      b2 = get_xavier_variable("b2", shape=(label_size))
+      output_raw = tf.matmul(h, U) + b2
+      output = tf.nn.dropout(output_raw, self.dropout_placeholder, name="Dropout")
     
-    summarize(W)
-    summarize(b1)
-    summarize(h)
+    summarize(U)
+    summarize(b2)
+    summarize(output_raw)
 
     # unscaled
-    self.reg_loss = tf.nn.l2_loss(W, name="W_l2") + tf.nn.l2_loss(U, name="U_l2")
+    #self.reg_loss = tf.nn.l2_loss(W, name="W_l2") + tf.nn.l2_loss(U, name="U_l2")
+    self.reg_loss = tf.reduce_sum(W ** 2, name="W_l2") + tf.reduce_sum(U ** 2, name="U_l2")
     ### END YOUR CODE
     return output 
 
@@ -246,8 +245,11 @@ class NERModel(LanguageModel):
     # TODO use tf.nn.sparse_softmax_cross_entropy_with_logits
     loss_per_sample = tf.nn.softmax_cross_entropy_with_logits(y, self.labels_placeholder, name="cross_entropy_loss")
     ce_loss = tf.reduce_mean(loss_per_sample)
-    reg_loss = self.config.l2 * self.reg_loss
+    reg_loss = self.config.l2 * self.reg_loss / 2
     loss = ce_loss + reg_loss
+
+    # DEBUG
+    self.ce_loss = ce_loss
 
     tf.scalar_summary("ce_loss", ce_loss)
     tf.scalar_summary("reg_loss", reg_loss)
@@ -283,9 +285,9 @@ class NERModel(LanguageModel):
   def __init__(self, config):
     """Constructs the network using the helper functions defined above."""
     self.config = config
-    # TODO testing
-    #self.load_data(debug=False)
-    self.load_data(debug=True)
+    # DEBUG testing
+    self.load_data(debug=False)
+    #self.load_data(debug=True)
     self.add_placeholders()
     window = self.add_embedding()
     y = self.add_model(window)
@@ -297,6 +299,7 @@ class NERModel(LanguageModel):
         tf.argmax(self.labels_placeholder, 1), one_hot_prediction)
     self.correct_predictions = tf.reduce_sum(tf.cast(correct_prediction, 'int32'))
     self.train_op = self.add_training_op(self.loss)
+    self.summary_op = tf.merge_all_summaries()
 
   def run_epoch(self, session, input_data, input_labels,
                 shuffle=True, verbose=True):
@@ -307,12 +310,15 @@ class NERModel(LanguageModel):
     total_correct_examples = 0
     total_processed_examples = 0
     total_steps = len(orig_X) / self.config.batch_size
+
     for step, (x, y) in enumerate(
       data_iterator(orig_X, orig_y, batch_size=self.config.batch_size,
                    label_size=self.config.label_size, shuffle=shuffle)):
       feed = self.create_feed_dict(input_batch=x, dropout=dp, label_batch=y)
-      loss, total_correct, _ = session.run(
-          [self.loss, self.correct_predictions, self.train_op],
+      loss, total_correct, _ , ce, reg, summary = session.run(
+          [self.loss, self.correct_predictions, self.train_op,
+            self.ce_loss, self.reg_loss, self.summary_op
+          ],
           feed_dict=feed)
       total_processed_examples += len(x)
       total_correct_examples += total_correct
@@ -321,10 +327,19 @@ class NERModel(LanguageModel):
       if verbose and step % verbose == 0:
         sys.stdout.write('\r{} / {} : loss = {}'.format(
             step, total_steps, np.mean(total_loss)))
+
+        
+        sys.stdout.write(' [ce: {} reg: {}]'.format(
+            ce, reg))
+        
+        self.summary_writer.add_summary(summary, step)
+
         sys.stdout.flush()
     if verbose:
         sys.stdout.write('\r')
         sys.stdout.flush()
+
+    sys.stdout.write('initial_reg_loss: {}\r'.format(initial_reg_loss))
     return np.mean(total_loss), total_correct_examples / float(total_processed_examples)
 
   def predict(self, session, X, y=None):
@@ -402,10 +417,7 @@ def test_NER():
       best_val_epoch = 0
 
       # add summary
-      summary_op = tf.merge_all_summaries()
-      if not os.path.exists("./summaries"):
-        os.makedirs("./summaries")
-      summary_writer = tf.train.SummaryWriter("./summaries")
+      model.summary_writer = tf.train.SummaryWriter("./weights", session.graph)
 
       session.run(init)
       for epoch in xrange(config.max_epochs):
@@ -414,9 +426,6 @@ def test_NER():
         ###
         train_loss, train_acc = model.run_epoch(session, model.X_train,
                                                 model.y_train)
-
-        # summarize epoch
-
 
         val_loss, predictions = model.predict(session, model.X_dev, model.y_dev)
         print 'Training loss: {}'.format(train_loss)

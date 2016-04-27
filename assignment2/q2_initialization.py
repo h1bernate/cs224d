@@ -25,7 +25,7 @@ def xavier_weight_init():
     """
     ### YOUR CODE HERE
     # TODO: do we need to add 1 for 1-d arrays?
-    e = np.sqrt(6 / np.array(shape).sum())
+    e = np.sqrt(6.0 / np.array(shape).sum())
     out = tf.random_uniform(shape, minval=-e, maxval=e)
     ### END YOUR CODE
     return out
@@ -57,8 +57,15 @@ def test_initialization():
   print "Running your tests..."
   ### YOUR CODE HERE
   # NOTE: Never invoked
-  raise NotImplementedError
+  xavier_initializer = xavier_weight_init()
+  shape = (1, 2, 3)
+  xavier_mat = tf.get_variable("U", shape, initializer=xavier_weight_init())
+  with tf.Session() as session:
+    session.run(tf.initialize_all_variables())
+    print xavier_mat.eval()
+    print tf.reduce_sum(xavier_mat).eval()
   ### END YOUR CODE  
 
 if __name__ == "__main__":
     test_initialization_basic()
+    test_initialization()
