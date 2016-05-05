@@ -157,27 +157,11 @@ class RNNLM_Model(LanguageModel):
       loss: A 0-d tensor (scalar)
     """
     ### YOUR CODE HERE
-    # weights?
-    #def sequence_loss(logits, targets, weights,
-    #              average_across_timesteps=True, average_across_batch=True,
-    #              softmax_loss_function=None, name=None):
-  """Weighted cross-entropy loss for a sequence of logits, batch-collapsed.
-  Args:
-    logits: List of 2D Tensors of shape [batch_size x num_decoder_symbols].
-    targets: List of 1D batch-sized int32 Tensors of the same length as logits.
-    weights: List of 1D batch-sized float-Tensors of the same length as logits.
-    average_across_timesteps: If set, divide the returned cost by the total
-      label weight.
-    average_across_batch: If set, divide the returned cost by the batch size.
-    softmax_loss_function: Function (inputs-batch, labels-batch) -> loss-batch
-      to be used instead of the standard softmax (the default if this is None).
-    name: Optional name for this operation, defaults to "sequence_loss".
-  Returns:
-    A scalar float Tensor: The average log-perplexity per symbol (weighted).
-  Raises:
-    ValueError: If len(logits) is different from len(targets) or len(weights).
-  """
-    #loss = sequence_loss(output, self.labels_placeholder, tf.constant(1.0, shape=))
+    logits = [output]
+    labels_in_steps = tf.reshape(tf.concat(0, self.labels_placeholder), [-1])
+    targets = [tf.to_int32(labels_in_steps)] # 
+    weights = [tf.ones([])] # 
+    loss = sequence_loss(logits, targets, weights)
     ### END YOUR CODE
     return loss
 
@@ -271,11 +255,11 @@ class RNNLM_Model(LanguageModel):
       I = tf.get_variable("I", shape=(self.config.embed_size, hidden_size))
       b1 = tf.get_variable("b1", shape=(hidden_size,))
 
-    self.initial_state = tf.Variable(tf.zeros([self.config.batch_size, hidden_size]))
+    self.initial_state = tf.zeros([self.config.batch_size, hidden_size], name="initial_state")
 
     prev_h = self.initial_state
     rnn_outputs = []
-    for step in input:
+    for step in inputs:
       # apply input dropout at each step
       step = tf.nn.dropout(step, self.dropout_placeholder)
       prev_h = tf.sigmoid(tf.matmul(prev_h, H) + tf.matmul(step, I) + b1)

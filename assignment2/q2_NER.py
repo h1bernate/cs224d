@@ -197,11 +197,6 @@ class NERModel(LanguageModel):
     def get_xavier_variable(name, shape):
       return tf.get_variable(name, shape, initializer=xavier_weight_init())
 
-    def summarize(x):
-      tensor_name = x.op.name
-      tf.histogram_summary(tensor_name + '/activations', x)
-      tf.scalar_summary(tensor_name + '/sparsity', tf.nn.zero_fraction(x))
-
     input_size = self.config.window_size*self.config.embed_size
     hidden_size = self.config.hidden_size
     label_size = self.config.label_size
@@ -211,19 +206,12 @@ class NERModel(LanguageModel):
       h_raw = tf.tanh(tf.matmul(window, W) + b1, name="h")
       h = tf.nn.dropout(h_raw, self.dropout_placeholder, name="Dropout")
 
-    summarize(W)
-    summarize(b1)
-    summarize(h_raw)
-
     with tf.variable_scope("Softmax"):
       U = get_xavier_variable("U", shape=(hidden_size, label_size))
       b2 = get_xavier_variable("b2", shape=(label_size))
       output_raw = tf.matmul(h, U) + b2
       output = tf.nn.dropout(output_raw, self.dropout_placeholder, name="Dropout")
-    
-    summarize(U)
-    summarize(b2)
-    summarize(output_raw)
+
 
     # unscaled
     #self.reg_loss = tf.nn.l2_loss(W, name="W_l2") + tf.nn.l2_loss(U, name="U_l2")
@@ -242,18 +230,11 @@ class NERModel(LanguageModel):
       loss: A 0-d tensor (scalar)
     """
     ### YOUR CODE HERE
-    # TODO use tf.nn.sparse_softmax_cross_entropy_with_logits
     loss_per_sample = tf.nn.softmax_cross_entropy_with_logits(y, self.labels_placeholder, name="cross_entropy_loss")
     ce_loss = tf.reduce_mean(loss_per_sample)
     reg_loss = self.config.l2 * self.reg_loss / 2
     loss = ce_loss + reg_loss
 
-    # DEBUG
-    self.ce_loss = ce_loss
-
-    tf.scalar_summary("ce_loss", ce_loss)
-    tf.scalar_summary("reg_loss", reg_loss)
-    tf.scalar_summary("total_loss", loss)
     ### END YOUR CODE
     return loss
 
@@ -315,9 +296,8 @@ class NERModel(LanguageModel):
       data_iterator(orig_X, orig_y, batch_size=self.config.batch_size,
                    label_size=self.config.label_size, shuffle=shuffle)):
       feed = self.create_feed_dict(input_batch=x, dropout=dp, label_batch=y)
-      loss, total_correct, _ , ce, reg, summary = session.run(
-          [self.loss, self.correct_predictions, self.train_op,
-            self.ce_loss, self.reg_loss, self.summary_op
+      loss, total_correct, _  = session.run(
+          [self.loss, self.correct_predictions, self.train_op
           ],
           feed_dict=feed)
       total_processed_examples += len(x)
@@ -327,12 +307,6 @@ class NERModel(LanguageModel):
       if verbose and step % verbose == 0:
         sys.stdout.write('\r{} / {} : loss = {}'.format(
             step, total_steps, np.mean(total_loss)))
-
-        
-        sys.stdout.write(' [ce: {} reg: {}]'.format(
-            ce, reg))
-        
-        self.summary_writer.add_summary(summary, step)
 
         sys.stdout.flush()
     if verbose:
