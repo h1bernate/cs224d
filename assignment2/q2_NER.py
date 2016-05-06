@@ -313,7 +313,6 @@ class NERModel(LanguageModel):
         sys.stdout.write('\r')
         sys.stdout.flush()
 
-    sys.stdout.write('initial_reg_loss: {}\r'.format(initial_reg_loss))
     return np.mean(total_loss), total_correct_examples / float(total_processed_examples)
 
   def predict(self, session, X, y=None):

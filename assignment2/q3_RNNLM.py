@@ -105,14 +105,11 @@ class RNNLM_Model(LanguageModel):
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
       L = tf.get_variable("L", shape=(len(self.vocab), self.config.embed_size))
-      
-      # self.input_placeholder is (batch_size, num_steps)
 
-      # shape is (num_steps, batch_size, embed_size) 
-      inputs = tf.nn.embedding_lookup(L, tf.transpose(self.input_placeholder))
-      
-      # convert to list...
-      inputs = [tf.squeeze(x) for x in tf.split(0, self.config.num_steps, inputs)]
+      # shape is (batch_size, num_steps, embed_size) 
+      inputs = tf.nn.embedding_lookup(L, self.input_placeholder)     
+      # convert to list...and only squeeze num_steps dimension
+      inputs = [tf.squeeze(x, squeeze_dims=[1]) for x in tf.split(1, self.config.num_steps, inputs)]
       ### END YOUR CODE
       return inputs
 
@@ -137,12 +134,10 @@ class RNNLM_Model(LanguageModel):
     """
     ### YOUR CODE HERE
     with tf.variable_scope("Projection"):
-      # initializer?
+      # no initializer - use default
       U = tf.get_variable("U", shape=(self.config.hidden_size, len(self.vocab)))
       b2 = tf.get_variable("b2", shape=(len(self.vocab),))
       outputs = [tf.matmul(h, U) + b2 for h in rnn_outputs]
-      # dropout?
-      # outputs = [tf.nn.dropout(o, self.dropout_placeholder) for o in outputs]
     ### END YOUR CODE
     return outputs
 
@@ -159,8 +154,8 @@ class RNNLM_Model(LanguageModel):
     ### YOUR CODE HERE
     logits = [output]
     labels_in_steps = tf.reshape(tf.concat(0, self.labels_placeholder), [-1])
-    targets = [tf.to_int32(labels_in_steps)] # 
-    weights = [tf.ones([])] # 
+    targets = [tf.to_int32(labels_in_steps)]
+    weights = [tf.ones([])]
     loss = sequence_loss(logits, targets, weights)
     ### END YOUR CODE
     return loss
@@ -262,7 +257,7 @@ class RNNLM_Model(LanguageModel):
     for step in inputs:
       # apply input dropout at each step
       step = tf.nn.dropout(step, self.dropout_placeholder)
-      prev_h = tf.sigmoid(tf.matmul(prev_h, H) + tf.matmul(step, I) + b1)
+      prev_h = tf.sigmoid(tf.matmul(prev_h, H, name="mulH") + tf.matmul(step, I, name="mulI") + b1)
       # apply output dropout at each step
       rnn_outputs.append(tf.nn.dropout(prev_h, self.dropout_placeholder))
     self.final_state = prev_h
@@ -323,7 +318,15 @@ def generate_text(session, model, config, starting_text='<eos>',
   tokens = [model.vocab.encode(word) for word in starting_text.split()]
   for i in xrange(stop_length):
     ### YOUR CODE HERE
-    raise NotImplementedError
+    dp = 1.0
+    feed = {model.input_placeholder: np.reshape(tokens[i], (1, 1)),
+            model.initial_state: state,
+            model.dropout_placeholder: dp}
+    state, y_pred = session.run(
+        [model.final_state, model.predictions[-1]], feed_dict=feed)
+    if i != len(tokens) - 1:
+      # only append to tokens if this is the last word
+      continue;
     ### END YOUR CODE
     next_word_idx = sample(y_pred[0], temperature=temp)
     tokens.append(next_word_idx)
@@ -355,6 +358,7 @@ def test_RNNLM():
     best_val_pp = float('inf')
     best_val_epoch = 0
   
+    
     session.run(init)
     for epoch in xrange(config.max_epochs):
       print 'Epoch {}'.format(epoch)
@@ -373,7 +377,8 @@ def test_RNNLM():
       if epoch - best_val_epoch > config.early_stopping:
         break
       print 'Total time: {}'.format(time.time() - start)
-      
+    
+
     saver.restore(session, 'ptb_rnnlm.weights')
     test_pp = model.run_epoch(session, model.encoded_test)
     print '=-=' * 5
