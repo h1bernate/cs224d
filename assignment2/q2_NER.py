@@ -212,9 +212,7 @@ class NERModel(LanguageModel):
       output_raw = tf.matmul(h, U) + b2
       output = tf.nn.dropout(output_raw, self.dropout_placeholder, name="Dropout")
 
-
-    # unscaled
-    #self.reg_loss = tf.nn.l2_loss(W, name="W_l2") + tf.nn.l2_loss(U, name="U_l2")
+    # set a variable on the current object to pass the reg_loss to the loss op method
     self.reg_loss = tf.reduce_sum(W ** 2, name="W_l2") + tf.reduce_sum(U ** 2, name="U_l2")
     ### END YOUR CODE
     return output 

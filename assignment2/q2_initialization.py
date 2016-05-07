@@ -24,8 +24,8 @@ def xavier_weight_init():
       out: tf.Tensor of specified shape sampled from Xavier distribution.
     """
     ### YOUR CODE HERE
-    # TODO: do we need to add 1 for 1-d arrays?
     e = np.sqrt(6.0 / np.array(shape).sum())
+    # NOTE technically maxval is exclusive...
     out = tf.random_uniform(shape, minval=-e, maxval=e)
     ### END YOUR CODE
     return out
