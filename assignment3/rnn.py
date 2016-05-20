@@ -67,13 +67,19 @@ class RNN_Model():
         Hint: Use a variable_scope "Composition" for the composition layer, and
               "Projection") for the linear transformations preceding the softmax.
         '''
+        embed_size = self.config.embed_size
+        vocab_size = len(self.vocab)
+        output_size = self.config.label_size
         with tf.variable_scope('Composition'):
             ### YOUR CODE HERE
-            pass
+            embedding = tf.get_variable("embedding", shape=(vocab_size, embed_size))
+            W1 = tf.get_variable("W1", shape=(2 * embed_size, embed_size))
+            b1 = tf.get_variable("b1", shape=(1, embed_size))
             ### END YOUR CODE
         with tf.variable_scope('Projection'):
             ### YOUR CODE HERE
-            pass
+            U = tf.get_variable("U", shape=(embed_size, output_size))
+            bs = tf.get_variable("bs", shape=(1, output_size))
             ### END YOUR CODE
 
     def add_model(self, node):
@@ -93,21 +99,30 @@ class RNN_Model():
         """
         with tf.variable_scope('Composition', reuse=True):
             ### YOUR CODE HERE
-            pass
+            embedding = tf.get_variable("embedding")
+            W1 = tf.get_variable("W1")
+            b1 = tf.get_variable("b1")
             ### END YOUR CODE
 
+
+        # THOUGHT: Batch together all leaf nodes and all non leaf nodes
 
         node_tensors = OrderedDict()
         curr_node_tensor = None
         if node.isLeaf:
             ### YOUR CODE HERE
-            pass
+            curr_node_tensor = tf.gather(embedding, tf.constant([node.label]), name="leaf_lookup")
             ### END YOUR CODE
         else:
             node_tensors.update(self.add_model(node.left))
             node_tensors.update(self.add_model(node.right))
             ### YOUR CODE HERE
-            pass
+            left = node_tensors[node.left]
+            right = node_tensors[node.right]
+            concat = tf.concat(1, [left, right])
+            composition = tf.matmul(concat, W1) + b1
+            # TODO save on number of zero tensors...
+            curr_node_tensor = tf.maximum(composition, tf.zeros_like(composition))
             ### END YOUR CODE
         node_tensors[node] = curr_node_tensor
         return node_tensors
@@ -123,7 +138,12 @@ class RNN_Model():
         """
         logits = None
         ### YOUR CODE HERE
-        pass
+        with tf.variable_scope('Projection', reuse=True):
+            U = tf.get_variable("U")
+            bs = tf.get_variable("bs")
+
+        # NOTE: tf.add supports Broadcast
+        logits = tf.matmul(node_tensors, U) + bs
         ### END YOUR CODE
         return logits
 
@@ -140,7 +160,18 @@ class RNN_Model():
         """
         loss = None
         # YOUR CODE HERE
-        pass
+        labels = tf.convert_to_tensor(labels, dtype=tf.int64)
+        softmax_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits, labels)
+
+        l2 = self.config.l2
+        with tf.variable_scope('Composition', reuse=True):
+            W1 = tf.get_variable("W1")
+        with tf.variable_scope('Projection', reuse=True):
+            U = tf.get_variable("U")
+        l2_loss = tf.nn.l2_loss(W1) + tf.nn.l2_loss(U)
+        l2_loss *= l2
+
+        loss = tf.reduce_sum(softmax_loss) + l2_loss
         # END YOUR CODE
         return loss
 
@@ -165,7 +196,8 @@ class RNN_Model():
         """
         train_op = None
         # YOUR CODE HERE
-        pass
+        optimizer = tf.train.GradientDescentOptimizer(self.config.lr)
+        train_op = optimizer.minimize(loss, name="train_op")
         # END YOUR CODE
         return train_op
 
@@ -179,7 +211,8 @@ class RNN_Model():
         """
         predictions = None
         # YOUR CODE HERE
-        pass
+        # pick max of softmax predictions in each batch
+        predictions = tf.argmax(tf.nn.softmax(tf.cast(y, tf.float64)), dimension=1)
         # END YOUR CODE
         return predictions
 
