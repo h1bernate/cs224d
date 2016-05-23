@@ -18,6 +18,7 @@ L2 = 0.02
 def writeToResults(s):
     with open("results_l2.csv", "a") as results:
         results.write(s)
+        results.write("\n")
 
 RESET_AFTER = 50
 class Config(object):
@@ -359,6 +360,7 @@ class RNN_Model():
         return confmat
 
 def sweepEmbedSize():
+    global L2
     for x in [0.01, 0.015, 0.03, 0.05]:
         L2 = x 
         test_RNN()
@@ -381,7 +383,7 @@ def test_RNN():
     plt.xlabel('Iteration')
     plt.ylabel('Loss')
     plt.savefig("loss_history_%s.png" % model.config.model_name)
-    plt.show()
+    #plt.show()
 
     print 'Test'
     print '=-=-='

@@ -18,6 +18,7 @@ L2 = 0.02
 def writeToResults(s):
     with open("results_lr.csv", "a") as results:
         results.write(s)
+        results.write("\n")
 
 RESET_AFTER = 50
 class Config(object):
@@ -359,6 +360,7 @@ class RNN_Model():
         return confmat
 
 def sweepEmbedSize():
+    global LR
     for x in [0.007, 0.009, 0.011, 0.013]:
         LR = x
         test_RNN()
@@ -371,6 +373,7 @@ def test_RNN():
     so you can rapidly iterate.
     """
     config = Config()
+    print 'Running config %s, LR=%s'%(config.model_name,LR)
     model = RNN_Model(config)
     start_time = time.time()
     stats = model.train(verbose=True)
@@ -381,7 +384,7 @@ def test_RNN():
     plt.xlabel('Iteration')
     plt.ylabel('Loss')
     plt.savefig("loss_history_%s.png" % model.config.model_name)
-    plt.show()
+    #plt.show()
 
     print 'Test'
     print '=-=-='
@@ -392,5 +395,4 @@ def test_RNN():
     writeToResults('%s,%s'%(model.config.model_name, test_acc))
 
 if __name__ == "__main__":
-        writeToResults("test")
         sweepEmbedSize()

@@ -18,6 +18,8 @@ L2 = 0.02
 def writeToResults(s):
     with open("results_emb.csv", "a") as results:
         results.write(s)
+        results.write("\n")
+
 
 RESET_AFTER = 50
 class Config(object):
@@ -359,6 +361,7 @@ class RNN_Model():
         return confmat
 
 def sweepEmbedSize():
+    global EMBED_SIZE
     for x in [25, 30, 40, 45, 50]:
         EMBED_SIZE = x
         test_RNN()
@@ -382,7 +385,7 @@ def test_RNN():
     plt.xlabel('Iteration')
     plt.ylabel('Loss')
     plt.savefig("loss_history_%s.png" % model.config.model_name)
-    plt.show()
+    #plt.show()
 
     print 'Test'
     print '=-=-='
