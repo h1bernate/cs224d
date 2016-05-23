@@ -11,19 +11,23 @@ import tree as tr
 from utils import Vocab
 from collections import OrderedDict
 
+EMBED_SIZE = 35
+LR = 0.01
+L2 = 0.02
+
 RESET_AFTER = 50
 class Config(object):
     """Holds model hyperparams and data information.
        Model objects are passed a Config() object at instantiation.
     """
-    embed_size = 35
+    embed_size = EMBED_SIZE
     label_size = 2
     early_stopping = 2
     anneal_threshold = 0.99
     anneal_by = 1.5
     max_epochs = 30
-    lr = 0.01
-    l2 = 0.02
+    lr = LR
+    l2 = L2
     model_name = 'rnn_embed=%d_l2=%f_lr=%f.weights'%(embed_size, l2, lr)
 
 
@@ -349,6 +353,16 @@ class RNN_Model():
             confmat[l, p] += 1
         return confmat
 
+def sweepEmbedSize():
+    for x in [25, 30, 40, 45, 50]:
+        EMBED_SIZE = x
+        test_RNN()
+    for x in [0.007, 0.009, 0.011, 0.013]:
+        LR = x
+        test_RNN()
+    for x in [0.01, 0.015, 0.03, 0.05]:
+        L2 = x 
+        test_RNN()
 
 def test_RNN():
     """Test RNN model implementation.
@@ -378,4 +392,4 @@ def test_RNN():
     print 'Test acc: {}'.format(test_acc)
 
 if __name__ == "__main__":
-        test_RNN()
+        sweepEmbedSize()
