@@ -16,7 +16,7 @@ LR = 0.01
 L2 = 0.02
 
 def writeToResults(s):
-    with open("results.csv", "a") as results:
+    with open("results_emb.csv", "a") as results:
         results.write(s)
 
 RESET_AFTER = 50
@@ -271,7 +271,7 @@ class RNN_Model():
                 else:
                     saver = tf.train.Saver()
                     #saver.restore(sess, './weights/%s.temp'%self.config.model_name)
-                    saver.restore(sess, './sweep_weights/%s.temp'%self.config.model_name)
+                    saver.restore(sess, './weights_emb/%s.temp'%self.config.model_name)
                 for _ in xrange(RESET_AFTER):
                     if step>=len(self.train_data):
                         break
@@ -288,11 +288,11 @@ class RNN_Model():
                         sys.stdout.flush()
                     step+=1
                 saver = tf.train.Saver()
-                if not os.path.exists("./sweep_weights"):
-                    os.makedirs("./sweep_weights")
-                saver.save(sess, './sweep_weights/%s.temp'%self.config.model_name, write_meta_graph=False)
-        train_preds, _ = self.predict(self.train_data, './sweep_weights/%s.temp'%self.config.model_name)
-        val_preds, val_losses = self.predict(self.dev_data, './sweep_weights/%s.temp'%self.config.model_name, get_loss=True)
+                if not os.path.exists("./weights_emb"):
+                    os.makedirs("./weights_emb")
+                saver.save(sess, './weights_emb/%s.temp'%self.config.model_name, write_meta_graph=False)
+        train_preds, _ = self.predict(self.train_data, './weights_emb/%s.temp'%self.config.model_name)
+        val_preds, val_losses = self.predict(self.dev_data, './weights_emb/%s.temp'%self.config.model_name, get_loss=True)
         train_labels = [t.root.label for t in self.train_data]
         val_labels = [t.root.label for t in self.dev_data]
         train_acc = np.equal(train_preds, train_labels).mean()
@@ -332,7 +332,7 @@ class RNN_Model():
 
             #save if model has improved on val
             if val_loss < best_val_loss:
-                 shutil.copyfile('./sweep_weights/%s.temp'%self.config.model_name, './sweep_weights/%s'%self.config.model_name)
+                 shutil.copyfile('./weights_emb/%s.temp'%self.config.model_name, './weights_emb/%s'%self.config.model_name)
                  best_val_loss = val_loss
                  best_val_epoch = epoch
 
@@ -362,12 +362,7 @@ def sweepEmbedSize():
     for x in [25, 30, 40, 45, 50]:
         EMBED_SIZE = x
         test_RNN()
-    for x in [0.007, 0.009, 0.011, 0.013]:
-        LR = x
-        test_RNN()
-    for x in [0.01, 0.015, 0.03, 0.05]:
-        L2 = x 
-        test_RNN()
+
 
 def test_RNN():
     """Test RNN model implementation.
@@ -391,7 +386,7 @@ def test_RNN():
 
     print 'Test'
     print '=-=-='
-    predictions, _ = model.predict(model.test_data, './sweep_weights/%s'%model.config.model_name)
+    predictions, _ = model.predict(model.test_data, './weights_emb/%s'%model.config.model_name)
     labels = [t.root.label for t in model.test_data]
     test_acc = np.equal(predictions, labels).mean()
     print 'Test acc: {}'.format(test_acc)
