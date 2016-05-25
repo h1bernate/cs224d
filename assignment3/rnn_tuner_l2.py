@@ -15,6 +15,7 @@ EMBED_SIZE = 35
 LR = 0.01
 L2 = 0.02
 
+# Write results to a file.
 def writeToResults(s):
     with open("results_l2.csv", "a") as results:
         results.write(s)
@@ -360,11 +361,10 @@ class RNN_Model():
             confmat[l, p] += 1
         return confmat
 
-def sweepEmbedSize():
+# Sweep over regularization.
+def sweepL2():
     global L2
-    #for x in [0.01, 0.015, 0.03, 0.05]:
-    LR = 0.011
-    for x in [0.008, 0.012, 0.01, 0.2]:
+    for x in [0.008, 0.01, 0.012, 0.015, 0.03, 0.05]:
         L2 = x 
         test_RNN()
 
@@ -398,5 +398,4 @@ def test_RNN():
     writeToResults('%s,%s'%(model.config.model_name, test_acc))
 
 if __name__ == "__main__":
-        writeToResults("test")
-        sweepEmbedSize()
+        sweepL2()

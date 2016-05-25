@@ -15,6 +15,7 @@ EMBED_SIZE = 35
 LR = 0.01
 L2 = 0.02
 
+# Write results to a file.
 def writeToResults(s):
     with open("results_emb.csv", "a") as results:
         results.write(s)
@@ -361,6 +362,7 @@ class RNN_Model():
             confmat[l, p] += 1
         return confmat
 
+# Sweep over embedding sizes.
 def sweepEmbedSize():
     global EMBED_SIZE
     for x in [25, 30, 40, 45, 50]:
@@ -398,5 +400,4 @@ def test_RNN():
     writeToResults('%s,%s'%(model.config.model_name, test_acc))
 
 if __name__ == "__main__":
-        writeToResults("test")
         sweepEmbedSize()

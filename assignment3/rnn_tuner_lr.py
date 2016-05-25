@@ -15,6 +15,7 @@ EMBED_SIZE = 35
 LR = 0.01
 L2 = 0.02
 
+# Write results out to a file.
 def writeToResults(s):
     with open("results_lr.csv", "a") as results:
         results.write(s)
@@ -360,10 +361,10 @@ class RNN_Model():
             confmat[l, p] += 1
         return confmat
 
-def sweepEmbedSize():
+# Sweep over learning rate values.
+def sweepLR():
     global LR
-    #for x in [0.007, 0.009, 0.011, 0.013]:
-    for x in [0.02, 0.05, 0.07, 0.1]:
+    for x in [0.007, 0.009, 0.011, 0.013, 0.02, 0.05]:
         LR = x
         test_RNN()
 
@@ -397,4 +398,4 @@ def test_RNN():
     writeToResults('%s,%s'%(model.config.model_name, test_acc))
 
 if __name__ == "__main__":
-        sweepEmbedSize()
+        sweepLR()
