@@ -22,18 +22,19 @@ def writeToResults(s):
 
 RESET_AFTER = 50
 class Config(object):
-    """Holds model hyperparams and data information.
-       Model objects are passed a Config() object at instantiation.
-    """
-    embed_size = EMBED_SIZE
-    label_size = 2
-    early_stopping = 2
-    anneal_threshold = 0.99
-    anneal_by = 1.5
-    max_epochs = 30
-    lr = LR
-    l2 = L2
-    model_name = 'rnn_embed=%d_l2=%f_lr=%f.weights'%(embed_size, l2, lr)
+    def __init__(self):
+        """Holds model hyperparams and data information.
+           Model objects are passed a Config() object at instantiation.
+        """
+        self.embed_size = EMBED_SIZE
+        self.label_size = 2
+        self.early_stopping = 2
+        self.anneal_threshold = 0.99
+        self.anneal_by = 1.5
+        self.max_epochs = 30
+        self.lr = LR
+        self.l2 = L2
+        self.model_name = 'rnn_embed=%d_l2=%f_lr=%f.weights'%(self.embed_size, self.l2, self.lr)
 
 
 class RNN_Model():
@@ -361,7 +362,9 @@ class RNN_Model():
 
 def sweepEmbedSize():
     global L2
-    for x in [0.01, 0.015, 0.03, 0.05]:
+    #for x in [0.01, 0.015, 0.03, 0.05]:
+    LR = 0.011
+    for x in [0.008, 0.012, 0.01, 0.2]:
         L2 = x 
         test_RNN()
 
@@ -373,6 +376,7 @@ def test_RNN():
     so you can rapidly iterate.
     """
     config = Config()
+    print 'Running config %s, L2=%s'%(config.model_name,L2)
     model = RNN_Model(config)
     start_time = time.time()
     stats = model.train(verbose=True)
